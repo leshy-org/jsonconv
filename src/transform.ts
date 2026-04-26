@@ -181,17 +181,100 @@ export function applyTransform(value: unknown, transform: TransformConfig): unkn
 }
 
 export function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
-  const keys = path.split('.');
+  const tokens = parsePath(path);
   let current: unknown = obj;
-  for (const key of keys) {
+  for (const token of tokens) {
     if (current === null || current === undefined) return undefined;
-    if (typeof current === 'object' && current !== null) {
-      current = (current as Record<string, unknown>)[key];
-    } else {
-      return undefined;
+    if (token.type === 'key') {
+      if (typeof current === 'object' && current !== null && !Array.isArray(current)) {
+        current = (current as Record<string, unknown>)[token.value];
+      } else {
+        return undefined;
+      }
+    } else if (token.type === 'index') {
+      if (Array.isArray(current)) {
+        if (token.value === -1) {
+          return current.map((item) => getNestedValueFromTokens(item, tokens.slice(tokens.indexOf(token) + 1)));
+        }
+        current = current[token.value as number];
+      } else {
+        return undefined;
+      }
     }
   }
   return current;
+}
+
+function getNestedValueFromTokens(obj: unknown, tokens: { type: string; value: string | number }[]): unknown {
+  let current: unknown = obj;
+  for (const token of tokens) {
+    if (current === null || current === undefined) return undefined;
+    if (token.type === 'key') {
+      if (typeof current === 'object' && current !== null && !Array.isArray(current)) {
+        current = (current as Record<string, unknown>)[token.value as string];
+      } else {
+        return undefined;
+      }
+    } else if (token.type === 'index') {
+      if (Array.isArray(current)) {
+        if (token.value === -1) {
+          return current.map((item) => getNestedValueFromTokens(item, tokens.slice(tokens.indexOf(token) + 1)));
+        }
+        current = current[token.value as number];
+      } else {
+        return undefined;
+      }
+    }
+  }
+  return current;
+}
+
+export function parsePath(path: string): { type: 'key' | 'index'; value: string | number }[] {
+  const tokens: { type: 'key' | 'index'; value: string | number }[] = [];
+  let i = 0;
+  while (i < path.length) {
+    if (path[i] === '[') {
+      const end = path.indexOf(']', i);
+      if (end === -1) break;
+      const content = path.substring(i + 1, end);
+      if (content === '') {
+        tokens.push({ type: 'index', value: -1 });
+      } else {
+        const idx = parseInt(content, 10);
+        tokens.push({ type: 'index', value: isNaN(idx) ? -1 : idx });
+      }
+      i = end + 1;
+      if (i < path.length && path[i] === '.') i++;
+    } else if (path[i] === '.') {
+      i++;
+    } else {
+      let j = i;
+      while (j < path.length && path[j] !== '.' && path[j] !== '[') {
+        j++;
+      }
+      const key = path.substring(i, j);
+      if (key) tokens.push({ type: 'key', value: key });
+      i = j;
+    }
+  }
+  return tokens;
+}
+
+export function getArrayPath(path: string): { arrayPath: string; fieldPath: string } | null {
+  const bracketIdx = path.indexOf('[]');
+  if (bracketIdx === -1) return null;
+  const beforeBracket = path.substring(0, bracketIdx);
+  const afterBracket = path.substring(bracketIdx + 2);
+  return {
+    arrayPath: beforeBracket,
+    fieldPath: afterBracket.startsWith('.') ? afterBracket.substring(1) : afterBracket,
+  };
+}
+
+export function getArrayValues(obj: Record<string, unknown>, arrayPath: string): Record<string, unknown>[] {
+  const arr = getNestedValue(obj, arrayPath);
+  if (!Array.isArray(arr)) return [];
+  return arr as Record<string, unknown>[];
 }
 
 export function setNestedValue(obj: Record<string, unknown>, path: string, value: unknown): void {

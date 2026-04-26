@@ -2,7 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import * as path from 'path';
 import { merge } from './merger';
-import { MergeConfig, TransformConfig, FieldMapping } from './types';
+import { MergeConfig, TransformConfig, FieldMapping, FieldInfo } from './types';
 import { applyTransform, getNestedValue } from './transform';
 
 const app = express();
@@ -29,43 +29,85 @@ function buildPreviewKey(item: Record<string, unknown>, mappings: FieldMapping[]
   return parts.join('\x00');
 }
 
-function extractFields(data: unknown[]): { name: string; type: string; sample: unknown }[] {
-  if (!data || data.length === 0) return [];
+function extractFieldsRecursive(data: unknown[], prefix: string = '', depth: number = 0): FieldInfo[] {
+  if (!data || data.length === 0 || depth > 5) return [];
   const first = data[0] as Record<string, unknown>;
   if (!first || typeof first !== 'object') return [];
 
-  const fields: { name: string; type: string; sample: unknown }[] = [];
+  const fields: FieldInfo[] = [];
   for (const key of Object.keys(first)) {
+    const fullKey = prefix ? `${prefix}.${key}` : key;
     const val = first[key];
-    let type: string = typeof val;
-    if (Array.isArray(val)) type = 'array';
-    else if (val === null) type = 'null';
     const samples = data.slice(0, 5).map((d) => (d as Record<string, unknown>)[key]);
-    fields.push({ name: key, type, sample: samples });
+
+    if (Array.isArray(val)) {
+      const arr = val as unknown[];
+      if (arr.length > 0 && typeof arr[0] === 'object' && arr[0] !== null) {
+        const childFields = extractFieldsRecursive(
+          arr.filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null),
+          '',
+          depth + 1
+        );
+        fields.push({
+          name: fullKey,
+          type: 'array',
+          sample: samples,
+          isArray: true,
+          children: childFields,
+        });
+      } else {
+        fields.push({
+          name: fullKey,
+          type: 'array',
+          sample: samples,
+          isArray: true,
+        });
+      }
+    } else if (val && typeof val === 'object') {
+      const childFields = extractFieldsRecursive(
+        data.map((d) => (d as Record<string, unknown>)[key]).filter((d): d is Record<string, unknown> => typeof d === 'object' && d !== null),
+        '',
+        depth + 1
+      );
+      fields.push({
+        name: fullKey,
+        type: 'object',
+        sample: samples,
+        children: childFields,
+      });
+    } else {
+      let type: string = typeof val;
+      if (val === null) type = 'null';
+      fields.push({
+        name: fullKey,
+        type,
+        sample: samples,
+      });
+    }
   }
   return fields;
 }
 
-function extractNestedFields(data: unknown[], prefix: string = ''): { name: string; type: string; sample: unknown }[] {
-  if (!data || data.length === 0) return [];
-  const first = data[0] as Record<string, unknown>;
-  if (!first || typeof first !== 'object') return [];
+function extractFields(data: unknown[]): FieldInfo[] {
+  return extractFieldsRecursive(data);
+}
 
-  const fields: { name: string; type: string; sample: unknown }[] = [];
-  for (const key of Object.keys(first)) {
-    const fullKey = prefix ? `${prefix}.${key}` : key;
-    const val = first[key];
-    if (val && typeof val === 'object' && !Array.isArray(val)) {
-      fields.push(...extractNestedFields(data.map((d) => (d as Record<string, unknown>)[key] as unknown[]).filter(Boolean), fullKey));
-    } else {
-      let type: string = typeof val;
-      if (Array.isArray(val)) type = 'array';
-      else if (val === null) type = 'null';
-      const samples = data.slice(0, 5).map((d) => (d as Record<string, unknown>)[key]);
-      fields.push({ name: fullKey, type, sample: samples });
+function flattenFieldInfo(fields: FieldInfo[], prefix: string = ''): { name: string; type: string; sample: unknown; isArray?: boolean }[] {
+  const result: { name: string; type: string; sample: unknown; isArray?: boolean }[] = [];
+  for (const field of fields) {
+    const fullName = prefix ? `${prefix}.${field.name}` : field.name;
+    result.push({
+      name: fullName,
+      type: field.type,
+      sample: field.sample,
+      isArray: field.isArray,
+    });
+    if (field.children && field.children.length > 0) {
+      const childPrefix = field.isArray ? `${fullName}[]` : fullName;
+      result.push(...flattenFieldInfo(field.children, childPrefix));
     }
   }
-  return fields;
+  return result;
 }
 
 app.post('/api/upload', upload.fields([{ name: 'left' }, { name: 'right' }]), (req, res) => {
@@ -91,13 +133,17 @@ app.post('/api/upload', upload.fields([{ name: 'left' }, { name: 'right' }]), (r
     const sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2);
     sessions.set(sessionId, { left: leftData, right: rightData });
 
-    const leftFields = extractFields(leftData);
-    const rightFields = extractFields(rightData);
+    const leftFieldsTree = extractFields(leftData);
+    const rightFieldsTree = extractFields(rightData);
+    const leftFields = flattenFieldInfo(leftFieldsTree);
+    const rightFields = flattenFieldInfo(rightFieldsTree);
 
     res.json({
       sessionId,
       leftFields,
       rightFields,
+      leftFieldsTree,
+      rightFieldsTree,
       leftPreview: leftData.slice(0, 10),
       rightPreview: rightData.slice(0, 10),
       leftCount: leftData.length,

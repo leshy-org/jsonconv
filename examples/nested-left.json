@@ -1,0 +1,25 @@
+[
+  {
+    "orderId": "ORD001",
+    "customer": "张三",
+    "items": [
+      { "sku": "SKU-A001", "name": "商品A", "qty": 2, "price": 100 },
+      { "sku": "SKU-B002", "name": "商品B", "qty": 1, "price": 200 }
+    ]
+  },
+  {
+    "orderId": "ORD002",
+    "customer": "李四",
+    "items": [
+      { "sku": "SKU-A001", "name": "商品A", "qty": 3, "price": 100 },
+      { "sku": "SKU-C003", "name": "商品C", "qty": 2, "price": 150 }
+    ]
+  },
+  {
+    "orderId": "ORD003",
+    "customer": "王五",
+    "items": [
+      { "sku": "SKU-D004", "name": "商品D", "qty": 1, "price": 500 }
+    ]
+  }
+]

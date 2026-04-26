@@ -79,6 +79,15 @@ let state = {
   matchIndex: -1,
   mergeResult: null,
   activeMappingIndex: -1,
+  nested: {
+    enabled: false,
+    mode: 'parent-child',
+    leftArrayPath: '',
+    rightArrayPath: '',
+    outputMode: 'nested',
+    outputArrayName: 'items',
+    mappings: [{ leftField: '', rightField: '', leftTransform: null, rightTransform: null }],
+  },
 };
 
 function $(sel) { return document.querySelector(sel); }
@@ -453,6 +462,80 @@ function autoDetectMappings() {
   state.activeMappingIndex = 0;
 }
 
+function getArrayFields(fields) {
+  return fields.filter(f => f.isArray);
+}
+
+function renderNestedConfig() {
+  const leftArrayFields = getArrayFields(state.leftFields);
+  const rightArrayFields = getArrayFields(state.rightFields);
+
+  const leftSelect = $('#nestedLeftArray');
+  const rightSelect = $('#nestedRightArray');
+
+  leftSelect.innerHTML = '<option value="">-- 选择 --</option>' +
+    leftArrayFields.map(f => `<option value="${escapeHtml(f.name)}" ${f.name === state.nested.leftArrayPath ? 'selected' : ''}>${escapeHtml(f.name)}</option>`).join('');
+
+  rightSelect.innerHTML = '<option value="">-- 选择 --</option>' +
+    rightArrayFields.map(f => `<option value="${escapeHtml(f.name)}" ${f.name === state.nested.rightArrayPath ? 'selected' : ''}>${escapeHtml(f.name)}</option>`).join('');
+
+  renderNestedFieldMappings();
+}
+
+function renderNestedFieldMappings() {
+  const container = $('#nestedFieldMappings');
+  if (!container) return;
+  container.innerHTML = '';
+
+  state.nested.mappings.forEach((mapping, i) => {
+    const row = document.createElement('div');
+    row.className = 'mapping-row';
+    row.innerHTML = `
+      <div class="mapping-side">
+        <label>左子字段</label>
+        <select data-nested="true" data-side="left" data-index="${i}" class="field-select">
+          <option value="">-- 选择 --</option>
+          ${state.leftFields.map(f =>
+            `<option value="${escapeHtml(f.name)}" ${f.name === mapping.leftField ? 'selected' : ''}>${escapeHtml(f.name)}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <div class="arrow">⟷</div>
+      <div class="mapping-side">
+        <label>右子字段</label>
+        <select data-nested="true" data-side="right" data-index="${i}" class="field-select">
+          <option value="">-- 选择 --</option>
+          ${state.rightFields.map(f =>
+            `<option value="${escapeHtml(f.name)}" ${f.name === mapping.rightField ? 'selected' : ''}>${escapeHtml(f.name)}</option>`
+          ).join('')}
+        </select>
+      </div>
+      <button class="remove-btn" data-nested="true" data-index="${i}" title="删除">✕</button>
+    `;
+    container.appendChild(row);
+  });
+
+  container.querySelectorAll('.field-select').forEach(sel => {
+    sel.addEventListener('change', e => {
+      const idx = parseInt(e.target.dataset.index);
+      const side = e.target.dataset.side;
+      state.nested.mappings[idx][side + 'Field'] = e.target.value;
+      updateSummaryPreview();
+    });
+  });
+
+  container.querySelectorAll('.remove-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const idx = parseInt(e.target.dataset.index);
+      if (state.nested.mappings.length > 1) {
+        state.nested.mappings.splice(idx, 1);
+        renderNestedFieldMappings();
+        updateSummaryPreview();
+      }
+    });
+  });
+}
+
 function buildConfig() {
   const fieldMappings = state.mappings.map(m => {
     const mapping = {
@@ -464,7 +547,7 @@ function buildConfig() {
     return mapping;
   });
 
-  return {
+  const config = {
     leftFile: '',
     rightFile: '',
     outputFile: 'output.json',
@@ -476,6 +559,23 @@ function buildConfig() {
     unmatchedLeft: $('#unmatchedLeft').value,
     unmatchedRight: $('#unmatchedRight').value,
   };
+
+  if (state.nested.enabled && state.nested.leftArrayPath && state.nested.rightArrayPath) {
+    config.nestedMatch = {
+      enabled: true,
+      mode: state.nested.mode,
+      leftArrayPath: state.nested.leftArrayPath,
+      rightArrayPath: state.nested.rightArrayPath,
+      outputMode: state.nested.outputMode,
+      outputArrayName: state.nested.outputArrayName || 'items',
+      fieldMappings: state.nested.mappings.filter(m => m.leftField && m.rightField).map(m => ({
+        leftField: m.leftField,
+        rightField: m.rightField,
+      })),
+    };
+  }
+
+  return config;
 }
 
 async function previewMatch() {
@@ -511,13 +611,17 @@ function renderMatchStats(stats) {
     container.innerHTML = '';
     return;
   }
-  container.innerHTML = `
+  let html = `
     <div class="stat-item">左侧: ${stats.leftTotal}</div>
     <div class="stat-item">右侧: ${stats.rightTotal}</div>
     <div class="stat-item success">匹配: ${stats.matched}</div>
     <div class="stat-item warning">左未匹配: ${stats.unmatchedLeft}</div>
     <div class="stat-item warning">右未匹配: ${stats.unmatchedRight}</div>
   `;
+  if (stats.nestedMatched !== undefined) {
+    html += `<div class="stat-item">嵌套匹配: ${stats.nestedMatched}</div>`;
+  }
+  container.innerHTML = html;
 }
 
 function showCurrentMatch() {
@@ -716,10 +820,20 @@ function initUpload() {
       state.mergeResult = null;
       state.matchPairs = [];
       state.matchIndex = -1;
+      state.nested = {
+        enabled: false,
+        mode: 'parent-child',
+        leftArrayPath: '',
+        rightArrayPath: '',
+        outputMode: 'nested',
+        outputArrayName: 'items',
+        mappings: [{ leftField: '', rightField: '', leftTransform: null, rightTransform: null }],
+      };
 
       autoDetectMappings();
       renderFieldMappings();
       renderJsonViews();
+      renderNestedConfig();
       updateSummaryPreview();
 
       $('#step1').classList.add('hidden');
@@ -762,6 +876,49 @@ function initNavigation() {
   $('#conflictStrategy').addEventListener('change', updateSummaryPreview);
   $('#unmatchedLeft').addEventListener('change', updateSummaryPreview);
   $('#unmatchedRight').addEventListener('change', updateSummaryPreview);
+
+  initNestedControls();
+}
+
+function initNestedControls() {
+  const nestedEnabled = $('#nestedEnabled');
+  const nestedConfig = $('#nestedConfig');
+
+  nestedEnabled.addEventListener('change', e => {
+    state.nested.enabled = e.target.checked;
+    nestedConfig.classList.toggle('hidden', !e.target.checked);
+    updateSummaryPreview();
+  });
+
+  $('#nestedMode').addEventListener('change', e => {
+    state.nested.mode = e.target.value;
+    updateSummaryPreview();
+  });
+
+  $('#nestedLeftArray').addEventListener('change', e => {
+    state.nested.leftArrayPath = e.target.value;
+    updateSummaryPreview();
+  });
+
+  $('#nestedRightArray').addEventListener('change', e => {
+    state.nested.rightArrayPath = e.target.value;
+    updateSummaryPreview();
+  });
+
+  $('#nestedOutputMode').addEventListener('change', e => {
+    state.nested.outputMode = e.target.value;
+    updateSummaryPreview();
+  });
+
+  $('#nestedOutputName').addEventListener('input', e => {
+    state.nested.outputArrayName = e.target.value || 'items';
+    updateSummaryPreview();
+  });
+
+  $('#btnAddNestedMapping').addEventListener('click', () => {
+    state.nested.mappings.push({ leftField: '', rightField: '', leftTransform: null, rightTransform: null });
+    renderNestedFieldMappings();
+  });
 }
 
 function debounce(fn, ms) {

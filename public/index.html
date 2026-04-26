@@ -120,6 +120,53 @@
                 </div>
               </div>
             </div>
+
+            <div class="config-section nested-section">
+              <div class="section-header">
+                <h3>嵌套数组匹配</h3>
+                <label class="toggle-label">
+                  <input type="checkbox" id="nestedEnabled">
+                  <span>启用</span>
+                </label>
+              </div>
+              <div class="nested-config hidden" id="nestedConfig">
+                <div class="options-compact">
+                  <div class="option-group">
+                    <label>匹配模式</label>
+                    <select id="nestedMode">
+                      <option value="parent-child">先父后子</option>
+                      <option value="independent">独立匹配</option>
+                    </select>
+                  </div>
+                  <div class="option-group">
+                    <label>左侧数组路径</label>
+                    <select id="nestedLeftArray"></select>
+                  </div>
+                  <div class="option-group">
+                    <label>右侧数组路径</label>
+                    <select id="nestedRightArray"></select>
+                  </div>
+                  <div class="option-group">
+                    <label>输出模式</label>
+                    <select id="nestedOutputMode">
+                      <option value="nested">保持嵌套</option>
+                      <option value="flat">展开扁平</option>
+                    </select>
+                  </div>
+                  <div class="option-group">
+                    <label>输出数组名</label>
+                    <input type="text" id="nestedOutputName" placeholder="items">
+                  </div>
+                </div>
+                <div class="nested-mappings">
+                  <div class="section-header">
+                    <span>子元素字段匹配</span>
+                    <button class="btn btn-outline btn-sm" id="btnAddNestedMapping">+ 添加</button>
+                  </div>
+                  <div id="nestedFieldMappings"></div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="config-right">

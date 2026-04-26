@@ -11,6 +11,16 @@ export interface TransformConfig {
   steps?: TransformConfig[];
 }
 
+export interface NestedMatchConfig {
+  enabled: boolean;
+  mode: 'parent-child' | 'independent';
+  leftArrayPath: string;
+  rightArrayPath: string;
+  fieldMappings: FieldMapping[];
+  outputMode: 'nested' | 'flat';
+  outputArrayName?: string;
+}
+
 export interface MergeConfig {
   leftFile: string;
   rightFile: string;
@@ -26,6 +36,7 @@ export interface MergeConfig {
   conflictStrategy?: 'overwrite' | 'skip' | 'prefix' | 'rename';
   unmatchedLeft?: 'include' | 'exclude';
   unmatchedRight?: 'include' | 'exclude';
+  nestedMatch?: NestedMatchConfig;
 }
 
 export interface MergeResult {
@@ -37,5 +48,14 @@ export interface MergeResult {
     unmatchedLeft: number;
     unmatchedRight: number;
     outputTotal: number;
+    nestedMatched?: number;
   };
+}
+
+export interface FieldInfo {
+  name: string;
+  type: string;
+  sample: unknown;
+  isArray?: boolean;
+  children?: FieldInfo[];
 }

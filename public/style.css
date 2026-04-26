@@ -573,6 +573,60 @@ body {
   background: var(--primary-bg);
 }
 
+.nested-section {
+  border-left: 3px solid var(--primary-light);
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.toggle-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.nested-config {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--gray-200);
+}
+
+.nested-config.hidden {
+  display: none;
+}
+
+.nested-mappings {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--gray-50);
+  border-radius: 6px;
+}
+
+.nested-mappings .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-700);
+}
+
+.array-field-opt {
+  font-weight: 500;
+  color: var(--primary);
+}
+
+.array-field-opt::before {
+  content: "📁 ";
+}
+
 @media (max-width: 900px) {
   .config-area { flex-direction: column; }
   .json-panels { flex-direction: column; }

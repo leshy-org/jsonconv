@@ -1,0 +1,25 @@
+[
+  {
+    "orderNo": "ORD001",
+    "status": "已发货",
+    "products": [
+      { "productCode": "SKU-A001", "stock": 50, "warehouse": "北京仓" },
+      { "productCode": "SKU-B002", "stock": 30, "warehouse": "上海仓" }
+    ]
+  },
+  {
+    "orderNo": "ORD002",
+    "status": "处理中",
+    "products": [
+      { "productCode": "SKU-A001", "stock": 50, "warehouse": "北京仓" },
+      { "productCode": "SKU-C003", "stock": 20, "warehouse": "广州仓" }
+    ]
+  },
+  {
+    "orderNo": "ORD004",
+    "status": "待付款",
+    "products": [
+      { "productCode": "SKU-E005", "stock": 100, "warehouse": "深圳仓" }
+    ]
+  }
+]

@@ -1,0 +1,28 @@
+[
+  {
+    "orderId": "ORD-2024-001",
+    "customer": "Alice",
+    "amount": 500,
+    "ref": "2024-001",
+    "status": "shipped",
+    "trackingNo": "TN123456"
+  },
+  {
+    "orderId": "ORD-2024-002",
+    "customer": "Bob",
+    "amount": 300,
+    "ref": "2024-002",
+    "status": "pending",
+    "trackingNo": null
+  },
+  {
+    "orderId": "ORD-2024-003",
+    "customer": "Charlie",
+    "amount": 800
+  },
+  {
+    "ref": "2024-004",
+    "status": "delivered",
+    "trackingNo": "TN789012"
+  }
+]

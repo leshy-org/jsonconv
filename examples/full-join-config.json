@@ -1,0 +1,19 @@
+{
+  "leftFile": "orders.json",
+  "rightFile": "shipments.json",
+  "outputFile": "full-join-output.json",
+  "fieldMappings": [
+    {
+      "leftField": "orderId",
+      "rightField": "ref",
+      "leftTransform": {
+        "type": "replace",
+        "args": { "search": "ORD-", "replacement": "" }
+      }
+    }
+  ],
+  "mergeMode": "full",
+  "conflictStrategy": "prefix",
+  "unmatchedLeft": "include",
+  "unmatchedRight": "include"
+}

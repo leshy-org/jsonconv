@@ -1,0 +1,20 @@
+[
+  {
+    "msgId": "0100",
+    "msgName": "授权请求",
+    "fixedDomain": "HEADER|0800",
+    "tlvDomain": "02=PAN:ans:19;04=Amount:n:12;14=ExpDate:n:4;22=PosEntryMode:n:3"
+  },
+  {
+    "msgId": "0200",
+    "msgName": "金融交易请求",
+    "fixedDomain": "HEADER|1200",
+    "tlvDomain": "02=PAN:ans:19;04=Amount:n:12;22=PosEntryMode:n:3;25=PosConditionCode:n:2;35=Track2:ans:37"
+  },
+  {
+    "msgId": "0500",
+    "msgName": "结算请求",
+    "fixedDomain": "HEADER|0500",
+    "tlvDomain": "02=PAN:ans:19;04=Amount:n:12"
+  }
+]

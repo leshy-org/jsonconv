@@ -1,0 +1,32 @@
+[
+  {
+    "msgId": "0100",
+    "msgName": "授权请求",
+    "elements": [
+      { "tag": "02", "name": "PAN", "type": "ans", "length": 19 },
+      { "tag": "04", "name": "Amount", "type": "n", "length": 12 },
+      { "tag": "14", "name": "ExpDate", "type": "n", "length": 4 },
+      { "tag": "22", "name": "PosEntryMode", "type": "n", "length": 3 }
+    ]
+  },
+  {
+    "msgId": "0200",
+    "msgName": "金融交易请求",
+    "elements": [
+      { "tag": "02", "name": "PAN", "type": "ans", "length": 19 },
+      { "tag": "04", "name": "Amount", "type": "n", "length": 12 },
+      { "tag": "22", "name": "PosEntryMode", "type": "n", "length": 3 },
+      { "tag": "25", "name": "PosConditionCode", "type": "n", "length": 2 },
+      { "tag": "35", "name": "Track2", "type": "ans", "length": 37 }
+    ]
+  },
+  {
+    "msgId": "0400",
+    "msgName": "撤销请求",
+    "elements": [
+      { "tag": "02", "name": "PAN", "type": "ans", "length": 19 },
+      { "tag": "04", "name": "Amount", "type": "n", "length": 12 },
+      { "tag": "22", "name": "PosEntryMode", "type": "n", "length": 3 }
+    ]
+  }
+]

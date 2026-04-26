@@ -1,0 +1,45 @@
+[
+  {
+    "employee": {
+      "id": 1,
+      "name": "张三",
+      "dept": "技术部"
+    },
+    "salary": {
+      "empNo": "EMP-001",
+      "salary": 15000,
+      "level": "P6"
+    }
+  },
+  {
+    "employee": {
+      "id": 2,
+      "name": "李四",
+      "dept": "市场部"
+    },
+    "salary": {
+      "empNo": "EMP-002",
+      "salary": 12000,
+      "level": "P5"
+    }
+  },
+  {
+    "employee": {
+      "id": 3,
+      "name": "王五",
+      "dept": "技术部"
+    },
+    "salary": {
+      "empNo": "EMP-003",
+      "salary": 18000,
+      "level": "P7"
+    }
+  },
+  {
+    "employee": {
+      "id": 4,
+      "name": "赵六",
+      "dept": "财务部"
+    }
+  }
+]

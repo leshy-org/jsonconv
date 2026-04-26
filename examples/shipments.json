@@ -1,0 +1,5 @@
+[
+  { "ref": "2024-001", "status": "shipped", "trackingNo": "TN123456" },
+  { "ref": "2024-002", "status": "pending", "trackingNo": null },
+  { "ref": "2024-004", "status": "delivered", "trackingNo": "TN789012" }
+]

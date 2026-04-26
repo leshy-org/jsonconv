@@ -1,0 +1,6 @@
+[
+  { "empNo": "EMP-001", "salary": 15000, "level": "P6" },
+  { "empNo": "EMP-002", "salary": 12000, "level": "P5" },
+  { "empNo": "EMP-003", "salary": 18000, "level": "P7" },
+  { "empNo": "EMP-005", "salary": 20000, "level": "P7" }
+]

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JSON 关联合并工具</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1>⚡ JSON 关联合并工具</h1>
+      <p class="subtitle">上传两个 JSON 数组，自定义字段匹配与转换，一键合并</p>
+    </header>
+
+    <!-- Step 1: Upload -->
+    <section class="panel" id="step1">
+      <h2>上传 JSON 文件</h2>
+      <div class="upload-row">
+        <div class="upload-box" id="leftDrop">
+          <div class="upload-icon">📄</div>
+          <p>左侧数据（主表）</p>
+          <input type="file" accept=".json" id="leftFile" hidden>
+          <label for="leftFile" class="btn btn-outline">选择文件</label>
+          <span class="file-name" id="leftFileName"></span>
+        </div>
+        <div class="upload-box" id="rightDrop">
+          <div class="upload-icon">📄</div>
+          <p>右侧数据（关联表）</p>
+          <input type="file" accept=".json" id="rightFile" hidden>
+          <label for="rightFile" class="btn btn-outline">选择文件</label>
+          <span class="file-name" id="rightFileName"></span>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" id="btnUpload" disabled>上传并解析 →</button>
+      </div>
+    </section>
+
+    <!-- Step 2: Unified Merge Page -->
+    <section class="panel hidden" id="step2">
+      <div class="merge-page">
+        <!-- Top: JSON Preview Panels -->
+        <div class="json-panels">
+          <div class="json-panel">
+            <div class="json-panel-header">
+              <span>左侧数据</span>
+              <span class="record-count" id="leftCount"></span>
+            </div>
+            <pre class="json-view" id="leftJsonView"></pre>
+          </div>
+          <div class="json-panel">
+            <div class="json-panel-header">
+              <span>右侧数据</span>
+              <span class="record-count" id="rightCount"></span>
+            </div>
+            <pre class="json-view" id="rightJsonView"></pre>
+          </div>
+        </div>
+        <div class="match-nav-bar">
+          <button class="btn btn-outline btn-sm" id="btnPreviewMatch">🔍 预览匹配</button>
+          <button class="btn btn-outline btn-sm" id="btnPrevMatch">◀ 上一对</button>
+          <span class="match-nav-info" id="matchNav">未预览</span>
+          <button class="btn btn-outline btn-sm" id="btnNextMatch">下一对 ▶</button>
+        </div>
+
+        <!-- Middle: Field Mapping + Transform + Options -->
+        <div class="config-area">
+          <div class="config-left">
+            <div class="config-section">
+              <div class="section-header">
+                <h3>字段匹配与转换</h3>
+                <button class="btn btn-outline btn-sm" id="btnAddMapping">+ 添加条件</button>
+              </div>
+              <div id="fieldMappings"></div>
+            </div>
+
+            <div class="config-section">
+              <h3>合并选项</h3>
+              <div class="options-compact">
+                <div class="option-group">
+                  <label>合并模式</label>
+                  <select id="mergeMode">
+                    <option value="left">左连接 (LEFT)</option>
+                    <option value="inner">内连接 (INNER)</option>
+                    <option value="right">右连接 (RIGHT)</option>
+                    <option value="full">全连接 (FULL)</option>
+                  </select>
+                </div>
+                <div class="option-group">
+                  <label>左侧别名</label>
+                  <input type="text" id="leftAlias" placeholder="留空不嵌套">
+                </div>
+                <div class="option-group">
+                  <label>右侧别名</label>
+                  <input type="text" id="rightAlias" placeholder="留空不嵌套">
+                </div>
+                <div class="option-group">
+                  <label>冲突策略</label>
+                  <select id="conflictStrategy">
+                    <option value="prefix">加前缀区分</option>
+                    <option value="overwrite">右侧覆盖</option>
+                    <option value="skip">保留左侧</option>
+                    <option value="rename">右侧加前缀</option>
+                  </select>
+                </div>
+                <div class="option-group">
+                  <label>左侧未匹配</label>
+                  <select id="unmatchedLeft">
+                    <option value="include">包含</option>
+                    <option value="exclude">排除</option>
+                  </select>
+                </div>
+                <div class="option-group">
+                  <label>右侧未匹配</label>
+                  <select id="unmatchedRight">
+                    <option value="exclude">排除</option>
+                    <option value="include">包含</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="config-right">
+            <div class="config-section summary-section">
+              <h3>合并预览</h3>
+              <div class="match-stats" id="matchStats"></div>
+              <div class="summary-preview-wrap">
+                <div class="summary-header">
+                  <span>合并后结构预览</span>
+                  <span class="preview-note" id="previewNote"></span>
+                </div>
+                <pre class="summary-preview" id="summaryPreview"></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button class="btn btn-outline" id="btnBack1">← 重新上传</button>
+          <button class="btn btn-primary" id="btnMerge">⚡ 执行合并</button>
+          <button class="btn btn-outline" id="btnExport" style="display:none">⬇ 导出 JSON</button>
+          <button class="btn btn-outline" id="btnCopy" style="display:none">📋 复制结果</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

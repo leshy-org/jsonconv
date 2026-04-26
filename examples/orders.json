@@ -1,0 +1,5 @@
+[
+  { "orderId": "ORD-2024-001", "customer": "Alice", "amount": 500 },
+  { "orderId": "ORD-2024-002", "customer": "Bob", "amount": 300 },
+  { "orderId": "ORD-2024-003", "customer": "Charlie", "amount": 800 }
+]

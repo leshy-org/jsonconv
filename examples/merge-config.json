@@ -1,0 +1,24 @@
+{
+  "leftFile": "left.json",
+  "rightFile": "right.json",
+  "outputFile": "output.json",
+  "fieldMappings": [
+    {
+      "leftField": "id",
+      "rightField": "empNo",
+      "leftTransform": {
+        "type": "chain",
+        "steps": [
+          { "type": "padStart", "args": { "length": 3, "fill": "0" } },
+          { "type": "prefix", "args": { "value": "EMP-" } }
+        ]
+      }
+    }
+  ],
+  "mergeMode": "left",
+  "leftAlias": "employee",
+  "rightAlias": "salary",
+  "conflictStrategy": "prefix",
+  "unmatchedLeft": "include",
+  "unmatchedRight": "exclude"
+}

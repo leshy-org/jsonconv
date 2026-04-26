@@ -2,8 +2,9 @@ import express from 'express';
 import multer from 'multer';
 import * as path from 'path';
 import { merge } from './merger';
-import { MergeConfig, TransformConfig, FieldMapping, FieldInfo } from './types';
+import { MergeConfig, TransformConfig, FieldMapping, FieldInfo, PreprocessConfig } from './types';
 import { applyTransform, getNestedValue } from './transform';
+import { applyPreprocess, previewPreprocess } from './preprocess';
 
 const app = express();
 const PORT = 3000;
@@ -13,7 +14,16 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-const sessions = new Map<string, { left: unknown[]; right: unknown[] }>();
+interface SessionData {
+  left: unknown[];
+  right: unknown[];
+  leftOriginal: unknown[];
+  rightOriginal: unknown[];
+  leftPreprocess?: PreprocessConfig;
+  rightPreprocess?: PreprocessConfig;
+}
+
+const sessions = new Map<string, SessionData>();
 
 function buildPreviewKey(item: Record<string, unknown>, mappings: FieldMapping[], side: 'left' | 'right'): string {
   const parts: string[] = [];
@@ -131,7 +141,12 @@ app.post('/api/upload', upload.fields([{ name: 'left' }, { name: 'right' }]), (r
     }
 
     const sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2);
-    sessions.set(sessionId, { left: leftData, right: rightData });
+    sessions.set(sessionId, {
+      left: leftData,
+      right: rightData,
+      leftOriginal: leftData,
+      rightOriginal: rightData,
+    });
 
     const leftFieldsTree = extractFields(leftData);
     const rightFieldsTree = extractFields(rightData);
@@ -151,6 +166,76 @@ app.post('/api/upload', upload.fields([{ name: 'left' }, { name: 'right' }]), (r
     });
   } catch (err) {
     res.status(400).json({ error: '文件解析失败: ' + (err instanceof Error ? err.message : String(err)) });
+  }
+});
+
+app.post('/api/preview-preprocess', (req, res) => {
+  try {
+    const { sessionId, side, config } = req.body as {
+      sessionId: string;
+      side: 'left' | 'right';
+      config: PreprocessConfig;
+    };
+
+    const session = sessions.get(sessionId);
+    if (!session) {
+      res.status(404).json({ error: '会话不存在，请重新上传文件' });
+      return;
+    }
+
+    const data = side === 'left' ? session.leftOriginal : session.rightOriginal;
+    const previews = previewPreprocess(data as Record<string, unknown>[], config);
+
+    res.json({ previews });
+  } catch (err) {
+    res.status(400).json({ error: '预览失败: ' + (err instanceof Error ? err.message : String(err)) });
+  }
+});
+
+app.post('/api/apply-preprocess', (req, res) => {
+  try {
+    const { sessionId, leftPreprocess, rightPreprocess } = req.body as {
+      sessionId: string;
+      leftPreprocess?: PreprocessConfig;
+      rightPreprocess?: PreprocessConfig;
+    };
+
+    const session = sessions.get(sessionId);
+    if (!session) {
+      res.status(404).json({ error: '会话不存在，请重新上传文件' });
+      return;
+    }
+
+    session.leftPreprocess = leftPreprocess;
+    session.rightPreprocess = rightPreprocess;
+
+    if (leftPreprocess?.enabled) {
+      session.left = applyPreprocess(session.leftOriginal as Record<string, unknown>[], leftPreprocess);
+    } else {
+      session.left = session.leftOriginal;
+    }
+
+    if (rightPreprocess?.enabled) {
+      session.right = applyPreprocess(session.rightOriginal as Record<string, unknown>[], rightPreprocess);
+    } else {
+      session.right = session.rightOriginal;
+    }
+
+    const leftFieldsTree = extractFields(session.left);
+    const rightFieldsTree = extractFields(session.right);
+    const leftFields = flattenFieldInfo(leftFieldsTree);
+    const rightFields = flattenFieldInfo(rightFieldsTree);
+
+    res.json({
+      leftFields,
+      rightFields,
+      leftPreview: session.left.slice(0, 10),
+      rightPreview: session.right.slice(0, 10),
+      leftCount: session.left.length,
+      rightCount: session.right.length,
+    });
+  } catch (err) {
+    res.status(400).json({ error: '预处理失败: ' + (err instanceof Error ? err.message : String(err)) });
   }
 });
 

@@ -1,0 +1,17 @@
+[
+  {
+    "msgId": "MSG001",
+    "status": "已激活",
+    "value": 12.3
+  },
+  {
+    "msgId": "MSG002",
+    "status": "已连接",
+    "value": 45.6
+  },
+  {
+    "msgId": "MSG004",
+    "status": "离线",
+    "value": 0
+  }
+]

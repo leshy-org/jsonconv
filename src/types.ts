@@ -21,6 +21,54 @@ export interface NestedMatchConfig {
   outputArrayName?: string;
 }
 
+export interface EnumOption {
+  value: string;
+  display: string;
+}
+
+export interface FloatFieldConfig {
+  defaultValue: string;
+  operator1: string;
+  operator2: string;
+  format: string;
+}
+
+export interface EnumFieldConfig {
+  defaultValue: string;
+  matchDisplay: string;
+  noMatchDisplay: string;
+  options: EnumOption[];
+}
+
+export interface CharFieldConfig {
+  defaultValue: string;
+}
+
+export interface IntFieldConfig {
+  defaultValue: string;
+  radix: number;
+}
+
+export interface ParsedFieldDef {
+  name: string;
+  typeMarker: string;
+  type: 'float' | 'enum' | 'char' | 'int' | 'raw';
+  config?: FloatFieldConfig | EnumFieldConfig | CharFieldConfig | IntFieldConfig;
+}
+
+export interface PreprocessRule {
+  field: string;
+  enabled: boolean;
+  pairSeparator: string;
+  kvSeparator: string;
+  fields: ParsedFieldDef[];
+}
+
+export interface PreprocessConfig {
+  enabled: boolean;
+  rules: PreprocessRule[];
+}
+
 export interface MergeConfig {
   leftFile: string;
   rightFile: string;
@@ -37,6 +85,8 @@ export interface MergeConfig {
   unmatchedLeft?: 'include' | 'exclude';
   unmatchedRight?: 'include' | 'exclude';
   nestedMatch?: NestedMatchConfig;
+  leftPreprocess?: PreprocessConfig;
+  rightPreprocess?: PreprocessConfig;
 }
 
 export interface MergeResult {

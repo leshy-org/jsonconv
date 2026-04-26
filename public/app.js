@@ -66,6 +66,14 @@ const TRANSFORM_ARGS = {
   custom: [{ key: 'function', label: '函数体' }],
 };
 
+const FIELD_TYPES = [
+  { value: 'raw', label: '原始' },
+  { value: 'float', label: '浮点' },
+  { value: 'enum', label: '枚举' },
+  { value: 'char', label: '字符' },
+  { value: 'int', label: '整数' },
+];
+
 let state = {
   sessionId: null,
   leftFields: [],
@@ -87,6 +95,10 @@ let state = {
     outputMode: 'nested',
     outputArrayName: 'items',
     mappings: [{ leftField: '', rightField: '', leftTransform: null, rightTransform: null }],
+  },
+  preprocess: {
+    left: { enabled: false, rules: [] },
+    right: { enabled: false, rules: [] },
   },
 };
 
@@ -829,15 +841,16 @@ function initUpload() {
         outputArrayName: 'items',
         mappings: [{ leftField: '', rightField: '', leftTransform: null, rightTransform: null }],
       };
+      state.preprocess = {
+        left: { enabled: false, rules: [] },
+        right: { enabled: false, rules: [] },
+      };
 
-      autoDetectMappings();
-      renderFieldMappings();
-      renderJsonViews();
-      renderNestedConfig();
-      updateSummaryPreview();
+      renderPreprocessConfig();
+      showPreprocessPreview();
 
       $('#step1').classList.add('hidden');
-      $('#step2').classList.remove('hidden');
+      $('#step1_5').classList.remove('hidden');
       showToast('文件上传成功！', 'success');
     } catch (err) {
       showToast(err.message);
@@ -846,6 +859,372 @@ function initUpload() {
       btnUpload.textContent = '上传并解析 →';
     }
   });
+}
+
+function renderPreprocessConfig() {
+  ['left', 'right'].forEach(side => {
+    const fields = side === 'left' ? state.leftFields : state.rightFields;
+    const rulesContainer = $(`#${side}PreprocessRules`);
+    rulesContainer.innerHTML = '';
+
+    state.preprocess[side].rules.forEach((rule, ri) => {
+      const ruleEl = document.createElement('div');
+      ruleEl.className = 'preprocess-rule';
+      ruleEl.innerHTML = `
+        <div class="rule-header">
+          <div class="rule-field">
+            <label>字段:</label>
+            <select data-side="${side}" data-rule="${ri}" class="rule-field-select">
+              <option value="">-- 选择 --</option>
+              ${fields.filter(f => f.type === 'string').map(f =>
+                `<option value="${escapeHtml(f.name)}" ${f.name === rule.field ? 'selected' : ''}>${escapeHtml(f.name)}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <button class="remove-btn" data-side="${side}" data-rule="${ri}">✕</button>
+        </div>
+        <div class="rule-separators">
+          <div class="option-group">
+            <label>对分隔符</label>
+            <input type="text" data-side="${side}" data-rule="${ri}" data-sep="pair" value="${escapeHtml(rule.pairSeparator || ',')}" placeholder=",">
+          </div>
+          <div class="option-group">
+            <label>KV分隔符</label>
+            <input type="text" data-side="${side}" data-rule="${ri}" data-sep="kv" value="${escapeHtml(rule.kvSeparator || '|')}" placeholder="|">
+          </div>
+        </div>
+        <div class="rule-fields">
+          <div class="rule-fields-header">
+            <span>字段定义</span>
+            <button class="btn btn-outline btn-sm" data-side="${side}" data-rule="${ri}" data-action="addField">+ 添加字段</button>
+          </div>
+          <div class="parsed-fields" id="${side}_rule_${ri}_fields"></div>
+        </div>
+      `;
+      rulesContainer.appendChild(ruleEl);
+      renderParsedFields(side, ri);
+    });
+  });
+
+  bindPreprocessEvents();
+}
+
+function renderParsedFields(side, ruleIndex) {
+  const rule = state.preprocess[side].rules[ruleIndex];
+  if (!rule) return;
+
+  const container = $(`#${side}_rule_${ruleIndex}_fields`);
+  if (!container) return;
+  container.innerHTML = '';
+
+  rule.fields.forEach((field, fi) => {
+    const fieldEl = document.createElement('div');
+    fieldEl.className = 'parsed-field';
+
+    let configHtml = '';
+    if (field.type === 'float') {
+      configHtml = `
+        <input type="text" placeholder="默认值" data-side="${side}" data-rule="${ruleIndex}" data-field="${fi}" data-config="defaultValue" value="${escapeHtml(field.config?.defaultValue || '')}">
+        <input type="text" placeholder="运算1(如*10)" data-side="${side}" data-rule="${ruleIndex}" data-field="${fi}" data-config="operator1" value="${escapeHtml(field.config?.operator1 || '')}">
+        <input type="text" placeholder="运算2(如%10)" data-side="${side}" data-rule="${ruleIndex}" data-field="${fi}" data-config="operator2" value="${escapeHtml(field.config?.operator2 || '')}">
+        <input type="text" placeholder="格式(如{0}.{1})" data-side="${side}" data-rule="${ruleIndex}" data-field="${fi}" data-config="format" value="${escapeHtml(field.config?.format || '')}">
+      `;
+    } else if (field.type === 'enum') {
+      const options = field.config?.options || [];
+      configHtml = `
+        <input type="text" placeholder="默认显示" data-side="${side}" data-rule="${ruleIndex}" data-field="${fi}" data-config="defaultValue" value="${escapeHtml(field.config?.defaultValue || '')}">
+        <input type="text" placeholder="匹配显示" data-side="${side}" data-rule="${ruleIndex}" data-field="${fi}" data-config="matchDisplay" value="${escapeHtml(field.config?.matchDisplay || '')}">
+        <input type="text" placeholder="未匹配显示" data-side="${side}" data-rule="${ruleIndex}" data-field="${fi}" data-config="noMatchDisplay" value="${escapeHtml(field.config?.noMatchDisplay || '')}">
+        <div class="enum-options">
+          ${options.map((opt, oi) => `
+            <span class="enum-option">
+              <input type="text" value="${escapeHtml(opt.value)}" data-side="${side}" data-rule="${ruleIndex}" data-field="${fi}" data-opt="${oi}" data-optkey="value">
+              →
+              <input type="text" value="${escapeHtml(opt.display)}" data-side="${side}" data-rule="${ruleIndex}" data-field="${fi}" data-opt="${oi}" data-optkey="display">
+              <span class="remove-opt" data-side="${side}" data-rule="${ruleIndex}" data-field="${fi}" data-opt="${oi}">✕</span>
+            </span>
+          `).join('')}
+          <button class="btn btn-outline btn-sm" data-side="${side}" data-rule="${ruleIndex}" data-field="${fi}" data-action="addEnumOpt">+选项</button>
+        </div>
+      `;
+    } else if (field.type === 'int') {
+      configHtml = `
+        <input type="text" placeholder="默认值" data-side="${side}" data-rule="${ruleIndex}" data-field="${fi}" data-config="defaultValue" value="${escapeHtml(field.config?.defaultValue || '')}">
+        <input type="text" placeholder="进制(10)" data-side="${side}" data-rule="${ruleIndex}" data-field="${fi}" data-config="radix" value="${escapeHtml(field.config?.radix || '10')}">
+      `;
+    } else if (field.type === 'char') {
+      configHtml = `
+        <input type="text" placeholder="默认值" data-side="${side}" data-rule="${ruleIndex}" data-field="${fi}" data-config="defaultValue" value="${escapeHtml(field.config?.defaultValue || '')}">
+      `;
+    }
+
+    fieldEl.innerHTML = `
+      <input type="text" placeholder="字段名" data-side="${side}" data-rule="${ruleIndex}" data-field="${fi}" data-fieldattr="name" value="${escapeHtml(field.name)}">
+      <input type="text" placeholder="标记" data-side="${side}" data-rule="${ruleIndex}" data-field="${fi}" data-fieldattr="typeMarker" value="${escapeHtml(field.typeMarker)}" style="width:50px">
+      <select data-side="${side}" data-rule="${ruleIndex}" data-field="${fi}" data-fieldattr="type">
+        ${FIELD_TYPES.map(t => `<option value="${t.value}" ${t.value === field.type ? 'selected' : ''}>${t.label}</option>`).join('')}
+      </select>
+      <div class="field-config">${configHtml}</div>
+      <button class="remove-btn" data-side="${side}" data-rule="${ruleIndex}" data-field="${fi}" data-action="removeField">✕</button>
+    `;
+    container.appendChild(fieldEl);
+  });
+
+  bindParsedFieldEvents(side, ruleIndex);
+}
+
+function bindPreprocessEvents() {
+  $$('.rule-field-select').forEach(sel => {
+    sel.addEventListener('change', e => {
+      const side = e.target.dataset.side;
+      const ri = parseInt(e.target.dataset.rule);
+      state.preprocess[side].rules[ri].field = e.target.value;
+      showPreprocessPreview();
+    });
+  });
+
+  $$('.rule-separators input').forEach(input => {
+    input.addEventListener('input', e => {
+      const side = e.target.dataset.side;
+      const ri = parseInt(e.target.dataset.rule);
+      const sepType = e.target.dataset.sep;
+      if (sepType === 'pair') {
+        state.preprocess[side].rules[ri].pairSeparator = e.target.value;
+      } else {
+        state.preprocess[side].rules[ri].kvSeparator = e.target.value;
+      }
+      showPreprocessPreview();
+    });
+  });
+
+  $$('[data-action="addField"]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const side = e.target.dataset.side;
+      const ri = parseInt(e.target.dataset.rule);
+      state.preprocess[side].rules[ri].fields.push({
+        name: '',
+        typeMarker: '',
+        type: 'raw',
+        config: {},
+      });
+      renderParsedFields(side, ri);
+    });
+  });
+
+  $$('.preprocess-rules .remove-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const side = e.target.dataset.side;
+      const ri = parseInt(e.target.dataset.rule);
+      state.preprocess[side].rules.splice(ri, 1);
+      renderPreprocessConfig();
+      showPreprocessPreview();
+    });
+  });
+
+  $('#btnAddLeftRule').addEventListener('click', () => {
+    state.preprocess.left.rules.push({
+      field: '',
+      enabled: true,
+      pairSeparator: ',',
+      kvSeparator: '|',
+      fields: [],
+    });
+    renderPreprocessConfig();
+  });
+
+  $('#btnAddRightRule').addEventListener('click', () => {
+    state.preprocess.right.rules.push({
+      field: '',
+      enabled: true,
+      pairSeparator: ',',
+      kvSeparator: '|',
+      fields: [],
+    });
+    renderPreprocessConfig();
+  });
+
+  $('#leftPreprocessEnabled').addEventListener('change', e => {
+    state.preprocess.left.enabled = e.target.checked;
+    $('#leftPreprocessContent').classList.toggle('hidden', !e.target.checked);
+    showPreprocessPreview();
+  });
+
+  $('#rightPreprocessEnabled').addEventListener('change', e => {
+    state.preprocess.right.enabled = e.target.checked;
+    $('#rightPreprocessContent').classList.toggle('hidden', !e.target.checked);
+    showPreprocessPreview();
+  });
+}
+
+function bindParsedFieldEvents(side, ruleIndex) {
+  const container = $(`#${side}_rule_${ruleIndex}_fields`);
+  if (!container) return;
+
+  container.querySelectorAll('[data-fieldattr]').forEach(input => {
+    input.addEventListener('input', e => {
+      const fi = parseInt(e.target.dataset.field);
+      const attr = e.target.dataset.fieldattr;
+      state.preprocess[side].rules[ruleIndex].fields[fi][attr] = e.target.value;
+      if (attr === 'type') {
+        const field = state.preprocess[side].rules[ruleIndex].fields[fi];
+        if (e.target.value === 'float') {
+          field.config = { defaultValue: '', operator1: '', operator2: '', format: '' };
+        } else if (e.target.value === 'enum') {
+          field.config = { defaultValue: '', matchDisplay: '', noMatchDisplay: '', options: [] };
+        } else if (e.target.value === 'int') {
+          field.config = { defaultValue: '', radix: 10 };
+        } else if (e.target.value === 'char') {
+          field.config = { defaultValue: '' };
+        } else {
+          field.config = {};
+        }
+        renderParsedFields(side, ruleIndex);
+      }
+      showPreprocessPreview();
+    });
+  });
+
+  container.querySelectorAll('[data-config]').forEach(input => {
+    input.addEventListener('input', e => {
+      const fi = parseInt(e.target.dataset.field);
+      const configKey = e.target.dataset.config;
+      if (!state.preprocess[side].rules[ruleIndex].fields[fi].config) {
+        state.preprocess[side].rules[ruleIndex].fields[fi].config = {};
+      }
+      state.preprocess[side].rules[ruleIndex].fields[fi].config[configKey] = e.target.value;
+      showPreprocessPreview();
+    });
+  });
+
+  container.querySelectorAll('[data-opt]').forEach(input => {
+    input.addEventListener('input', e => {
+      const fi = parseInt(e.target.dataset.field);
+      const oi = parseInt(e.target.dataset.opt);
+      const optKey = e.target.dataset.optkey;
+      state.preprocess[side].rules[ruleIndex].fields[fi].config.options[oi][optKey] = e.target.value;
+      showPreprocessPreview();
+    });
+  });
+
+  container.querySelectorAll('[data-action="removeField"]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const fi = parseInt(e.target.dataset.field);
+      state.preprocess[side].rules[ruleIndex].fields.splice(fi, 1);
+      renderParsedFields(side, ruleIndex);
+      showPreprocessPreview();
+    });
+  });
+
+  container.querySelectorAll('[data-action="addEnumOpt"]').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const fi = parseInt(e.target.dataset.field);
+      if (!state.preprocess[side].rules[ruleIndex].fields[fi].config.options) {
+        state.preprocess[side].rules[ruleIndex].fields[fi].config.options = [];
+      }
+      state.preprocess[side].rules[ruleIndex].fields[fi].config.options.push({ value: '', display: '' });
+      renderParsedFields(side, ruleIndex);
+    });
+  });
+
+  container.querySelectorAll('.remove-opt').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const fi = parseInt(e.target.dataset.field);
+      const oi = parseInt(e.target.dataset.opt);
+      state.preprocess[side].rules[ruleIndex].fields[fi].config.options.splice(oi, 1);
+      renderParsedFields(side, ruleIndex);
+      showPreprocessPreview();
+    });
+  });
+}
+
+async function showPreprocessPreview() {
+  if (!state.sessionId) return;
+
+  try {
+    const leftConfig = { enabled: state.preprocess.left.enabled, rules: state.preprocess.left.rules };
+    const rightConfig = { enabled: state.preprocess.right.enabled, rules: state.preprocess.right.rules };
+
+    const [leftRes, rightRes] = await Promise.all([
+      fetch('/api/preview-preprocess', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: state.sessionId, side: 'left', config: leftConfig }),
+      }),
+      fetch('/api/preview-preprocess', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: state.sessionId, side: 'right', config: rightConfig }),
+      }),
+    ]);
+
+    const leftData = await leftRes.json();
+    const rightData = await rightRes.json();
+
+    if (leftData.previews && leftData.previews.length > 0) {
+      const p = leftData.previews[0];
+      $('#leftPreprocessPreview').textContent = JSON.stringify(p.original, null, 2) + '\n\n→\n\n' + JSON.stringify(p.processed, null, 2);
+    } else {
+      $('#leftPreprocessPreview').textContent = '无数据';
+    }
+
+    if (rightData.previews && rightData.previews.length > 0) {
+      const p = rightData.previews[0];
+      $('#rightPreprocessPreview').textContent = JSON.stringify(p.original, null, 2) + '\n\n→\n\n' + JSON.stringify(p.processed, null, 2);
+    } else {
+      $('#rightPreprocessPreview').textContent = '无数据';
+    }
+  } catch (err) {
+    console.error('Preview error:', err);
+  }
+}
+
+async function applyPreprocess() {
+  const leftConfig = { enabled: state.preprocess.left.enabled, rules: state.preprocess.left.rules };
+  const rightConfig = { enabled: state.preprocess.right.enabled, rules: state.preprocess.right.rules };
+
+  try {
+    const res = await fetch('/api/apply-preprocess', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: state.sessionId,
+        leftPreprocess: leftConfig,
+        rightPreprocess: rightConfig,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    state.leftFields = data.leftFields;
+    state.rightFields = data.rightFields;
+    state.leftData = data.leftPreview;
+    state.rightData = data.rightPreview;
+    state.leftCount = data.leftCount;
+    state.rightCount = data.rightCount;
+
+    autoDetectMappings();
+    renderFieldMappings();
+    renderJsonViews();
+    renderNestedConfig();
+    updateSummaryPreview();
+
+    $('#step1_5').classList.add('hidden');
+    $('#step2').classList.remove('hidden');
+    showToast('预处理已应用！', 'success');
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+function skipPreprocess() {
+  autoDetectMappings();
+  renderFieldMappings();
+  renderJsonViews();
+  renderNestedConfig();
+  updateSummaryPreview();
+
+  $('#step1_5').classList.add('hidden');
+  $('#step2').classList.remove('hidden');
 }
 
 function initNavigation() {
@@ -858,6 +1237,14 @@ function initNavigation() {
     $('#step2').classList.add('hidden');
     $('#step1').classList.remove('hidden');
   });
+
+  $('#btnBackToUpload').addEventListener('click', () => {
+    $('#step1_5').classList.add('hidden');
+    $('#step1').classList.remove('hidden');
+  });
+
+  $('#btnSkipPreprocess').addEventListener('click', skipPreprocess);
+  $('#btnApplyPreprocess').addEventListener('click', applyPreprocess);
 
   $('#btnMerge').addEventListener('click', doMerge);
   $('#btnExport').addEventListener('click', exportResult);

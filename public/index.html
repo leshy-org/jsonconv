@@ -37,10 +37,67 @@
       </div>
     </section>
 
+    <!-- Step 1.5: Preprocess -->
+    <section class="panel hidden" id="step1_5">
+      <div class="step-header">
+        <h2>数据预处理（可选）</h2>
+        <p class="step-desc">对字符串字段进行分隔解析，支持TLV格式、枚举、浮点数等类型转换</p>
+      </div>
+
+      <div class="preprocess-container">
+        <div class="preprocess-side" id="leftPreprocessPanel">
+          <div class="preprocess-header">
+            <h3>左侧数据预处理</h3>
+            <label class="toggle-label">
+              <input type="checkbox" id="leftPreprocessEnabled">
+              <span>启用</span>
+            </label>
+          </div>
+          <div class="preprocess-content hidden" id="leftPreprocessContent">
+            <div class="preprocess-rules" id="leftPreprocessRules"></div>
+            <button class="btn btn-outline btn-sm" id="btnAddLeftRule">+ 添加规则</button>
+          </div>
+        </div>
+
+        <div class="preprocess-side" id="rightPreprocessPanel">
+          <div class="preprocess-header">
+            <h3>右侧数据预处理</h3>
+            <label class="toggle-label">
+              <input type="checkbox" id="rightPreprocessEnabled">
+              <span>启用</span>
+            </label>
+          </div>
+          <div class="preprocess-content hidden" id="rightPreprocessContent">
+            <div class="preprocess-rules" id="rightPreprocessRules"></div>
+            <button class="btn btn-outline btn-sm" id="btnAddRightRule">+ 添加规则</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="preprocess-preview">
+        <h4>预处理预览</h4>
+        <div class="preview-grid">
+          <div class="preview-col">
+            <div class="preview-label">左侧原始 → 处理后</div>
+            <pre class="preview-box" id="leftPreprocessPreview"></pre>
+          </div>
+          <div class="preview-col">
+            <div class="preview-label">右侧原始 → 处理后</div>
+            <pre class="preview-box" id="rightPreprocessPreview"></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-outline" id="btnBackToUpload">← 重新上传</button>
+        <button class="btn btn-outline" id="btnSkipPreprocess">跳过预处理 →</button>
+        <button class="btn btn-primary" id="btnApplyPreprocess">应用预处理 →</button>
+      </div>
+    </section>
+
     <!-- Step 2: Unified Merge Page -->
     <section class="panel hidden" id="step2">
       <div class="merge-page">
-        <!-- Top: JSON Preview Panels -->
         <div class="json-panels">
           <div class="json-panel">
             <div class="json-panel-header">
@@ -64,7 +121,6 @@
           <button class="btn btn-outline btn-sm" id="btnNextMatch">下一对 ▶</button>
         </div>
 
-        <!-- Middle: Field Mapping + Transform + Options -->
         <div class="config-area">
           <div class="config-left">
             <div class="config-section">

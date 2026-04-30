@@ -1,0 +1,17 @@
+{
+  "ORD001": {
+    "paymentMethod": "信用卡",
+    "shippingAddress": "北京市朝阳区",
+    "notes": "加急配送"
+  },
+  "ORD002": {
+    "paymentMethod": "支付宝",
+    "shippingAddress": "上海市浦东新区",
+    "notes": "周末配送"
+  },
+  "ORD004": {
+    "paymentMethod": "微信支付",
+    "shippingAddress": "广州市天河区",
+    "notes": "普通配送"
+  }
+}

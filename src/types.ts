@@ -109,3 +109,48 @@ export interface FieldInfo {
   isArray?: boolean;
   children?: FieldInfo[];
 }
+
+export interface FieldConstraints {
+  minLength?: number;
+  maxLength?: number;
+  min?: number;
+  max?: number;
+  pattern?: string;
+  enum?: string[];
+}
+
+export interface TemplateField {
+  path: string;
+  type: string;
+  required: boolean;
+  description: string;
+  defaultValue?: unknown;
+  sampleValue?: unknown;
+  constraints?: FieldConstraints;
+}
+
+export interface JsonTemplate {
+  id: string;
+  name: string;
+  description: string;
+  fields: TemplateField[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TemplateDiff {
+  path: string;
+  status: 'match' | 'missing' | 'extra' | 'type_mismatch' | 'constraint_violation';
+  expected?: string;
+  actual?: string;
+  message: string;
+}
+
+export interface TemplateValidationResult {
+  isValid: boolean;
+  matchCount: number;
+  missingCount: number;
+  extraCount: number;
+  violationCount: number;
+  diffs: TemplateDiff[];
+}

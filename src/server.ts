@@ -2,9 +2,10 @@ import express from 'express';
 import multer from 'multer';
 import * as path from 'path';
 import { merge } from './merger';
-import { MergeConfig, TransformConfig, FieldMapping, FieldInfo, PreprocessConfig } from './types';
+import { MergeConfig, TransformConfig, FieldMapping, FieldInfo, PreprocessConfig, JsonTemplate } from './types';
 import { applyTransform, getNestedValue } from './transform';
 import { applyPreprocess, previewPreprocess } from './preprocess';
+import { generateTemplate, validateAgainstTemplate, updateTemplateFromData } from './template';
 
 const app = express();
 const PORT = 3000;
@@ -21,9 +22,12 @@ interface SessionData {
   rightOriginal: unknown[];
   leftPreprocess?: PreprocessConfig;
   rightPreprocess?: PreprocessConfig;
+  template?: JsonTemplate;
+  mergedData?: Record<string, unknown>[];
 }
 
 const sessions = new Map<string, SessionData>();
+const templates = new Map<string, JsonTemplate>();
 
 function buildPreviewKey(item: Record<string, unknown>, mappings: FieldMapping[], side: 'left' | 'right'): string {
   const parts: string[] = [];
@@ -128,15 +132,35 @@ app.post('/api/upload', upload.fields([{ name: 'left' }, { name: 'right' }]), (r
       return;
     }
 
-    const leftData = JSON.parse(files.left[0].buffer.toString('utf-8'));
-    const rightData = JSON.parse(files.right[0].buffer.toString('utf-8'));
+    let leftData = JSON.parse(files.left[0].buffer.toString('utf-8'));
+    let rightData = JSON.parse(files.right[0].buffer.toString('utf-8'));
+
+    const leftIsObject = !Array.isArray(leftData) && typeof leftData === 'object' && leftData !== null;
+    const rightIsObject = !Array.isArray(rightData) && typeof rightData === 'object' && rightData !== null;
+
+    const leftKeys = leftIsObject ? Object.keys(leftData as Record<string, unknown>) : [];
+    const rightKeys = rightIsObject ? Object.keys(rightData as Record<string, unknown>) : [];
+
+    if (leftIsObject) {
+      leftData = Object.entries(leftData as Record<string, unknown>).map(([key, value]) => ({
+        _key: key,
+        ...(typeof value === 'object' && value !== null ? value as Record<string, unknown> : { _value: value }),
+      }));
+    }
+
+    if (rightIsObject) {
+      rightData = Object.entries(rightData as Record<string, unknown>).map(([key, value]) => ({
+        _key: key,
+        ...(typeof value === 'object' && value !== null ? value as Record<string, unknown> : { _value: value }),
+      }));
+    }
 
     if (!Array.isArray(leftData)) {
-      res.status(400).json({ error: '左侧JSON数据不是数组' });
+      res.status(400).json({ error: '左侧JSON数据格式不支持' });
       return;
     }
     if (!Array.isArray(rightData)) {
-      res.status(400).json({ error: '右侧JSON数据不是数组' });
+      res.status(400).json({ error: '右侧JSON数据格式不支持' });
       return;
     }
 
@@ -163,6 +187,10 @@ app.post('/api/upload', upload.fields([{ name: 'left' }, { name: 'right' }]), (r
       rightPreview: rightData.slice(0, 10),
       leftCount: leftData.length,
       rightCount: rightData.length,
+      leftIsObject,
+      rightIsObject,
+      leftKeys,
+      rightKeys,
     });
   } catch (err) {
     res.status(400).json({ error: '文件解析失败: ' + (err instanceof Error ? err.message : String(err)) });
@@ -376,6 +404,157 @@ app.post('/api/export', (req, res) => {
     res.send(JSON.stringify(result.data, null, 2));
   } catch (err) {
     res.status(400).json({ error: '导出失败: ' + (err instanceof Error ? err.message : String(err)) });
+  }
+});
+
+app.post('/api/template/generate', (req, res) => {
+  try {
+    const { sessionId, name, description } = req.body as {
+      sessionId: string;
+      name?: string;
+      description?: string;
+    };
+
+    const session = sessions.get(sessionId);
+    if (!session) {
+      res.status(404).json({ error: '会话不存在，请重新上传文件' });
+      return;
+    }
+
+    const data = session.mergedData || session.left as Record<string, unknown>[];
+    const template = generateTemplate(data, name, description);
+    
+    templates.set(template.id, template);
+    session.template = template;
+
+    res.json({ template });
+  } catch (err) {
+    res.status(400).json({ error: '生成模板失败: ' + (err instanceof Error ? err.message : String(err)) });
+  }
+});
+
+app.get('/api/templates', (req, res) => {
+  const templateList = Array.from(templates.values()).map(t => ({
+    id: t.id,
+    name: t.name,
+    description: t.description,
+    fieldCount: t.fields.length,
+    createdAt: t.createdAt,
+    updatedAt: t.updatedAt,
+  }));
+  res.json({ templates: templateList });
+});
+
+app.get('/api/template/:id', (req, res) => {
+  const template = templates.get(req.params.id);
+  if (!template) {
+    res.status(404).json({ error: '模板不存在' });
+    return;
+  }
+  res.json({ template });
+});
+
+app.put('/api/template/:id', (req, res) => {
+  try {
+    const { template: updates } = req.body as { template: Partial<JsonTemplate> };
+    const existing = templates.get(req.params.id);
+    
+    if (!existing) {
+      res.status(404).json({ error: '模板不存在' });
+      return;
+    }
+
+    const updated: JsonTemplate = {
+      ...existing,
+      ...updates,
+      id: existing.id,
+      createdAt: existing.createdAt,
+      updatedAt: new Date().toISOString(),
+    };
+
+    templates.set(req.params.id, updated);
+    res.json({ template: updated });
+  } catch (err) {
+    res.status(400).json({ error: '更新模板失败: ' + (err instanceof Error ? err.message : String(err)) });
+  }
+});
+
+app.delete('/api/template/:id', (req, res) => {
+  if (!templates.has(req.params.id)) {
+    res.status(404).json({ error: '模板不存在' });
+    return;
+  }
+  templates.delete(req.params.id);
+  res.json({ success: true });
+});
+
+app.post('/api/template/validate', (req, res) => {
+  try {
+    const { sessionId, templateId } = req.body as {
+      sessionId: string;
+      templateId?: string;
+    };
+
+    const session = sessions.get(sessionId);
+    if (!session) {
+      res.status(404).json({ error: '会话不存在，请重新上传文件' });
+      return;
+    }
+
+    let template = templateId ? templates.get(templateId) : session.template;
+    const data = session.mergedData || session.left as Record<string, unknown>[];
+
+    if (!template) {
+      template = generateTemplate(data);
+      session.template = template;
+      templates.set(template.id, template);
+    }
+
+    const validation = validateAgainstTemplate(data, template);
+    res.json({ template, validation });
+  } catch (err) {
+    res.status(400).json({ error: '验证失败: ' + (err instanceof Error ? err.message : String(err)) });
+  }
+});
+
+app.post('/api/template/compare', (req, res) => {
+  try {
+    const { sessionId } = req.body as { sessionId: string };
+
+    const session = sessions.get(sessionId);
+    if (!session) {
+      res.status(404).json({ error: '会话不存在，请重新上传文件' });
+      return;
+    }
+
+    const leftTemplate = generateTemplate(session.left as Record<string, unknown>[], '左侧数据模板');
+    const rightTemplate = generateTemplate(session.right as Record<string, unknown>[], '右侧数据模板');
+    const mergedTemplate = session.mergedData 
+      ? generateTemplate(session.mergedData, '合并结果模板')
+      : null;
+
+    res.json({
+      leftTemplate: {
+        id: leftTemplate.id,
+        name: leftTemplate.name,
+        fieldCount: leftTemplate.fields.length,
+        fields: leftTemplate.fields,
+      },
+      rightTemplate: {
+        id: rightTemplate.id,
+        name: rightTemplate.name,
+        fieldCount: rightTemplate.fields.length,
+        fields: rightTemplate.fields,
+      },
+      mergedTemplate: mergedTemplate ? {
+        id: mergedTemplate.id,
+        name: mergedTemplate.name,
+        fieldCount: mergedTemplate.fields.length,
+        fields: mergedTemplate.fields,
+      } : null,
+    });
+  } catch (err) {
+    res.status(400).json({ error: '对比失败: ' + (err instanceof Error ? err.message : String(err)) });
   }
 });
 

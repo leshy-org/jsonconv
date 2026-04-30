@@ -1,0 +1,17 @@
+{
+  "ORD001": {
+    "customer": "张三",
+    "amount": 1500,
+    "status": "已完成"
+  },
+  "ORD002": {
+    "customer": "李四",
+    "amount": 2300,
+    "status": "处理中"
+  },
+  "ORD003": {
+    "customer": "王五",
+    "amount": 800,
+    "status": "待付款"
+  }
+}

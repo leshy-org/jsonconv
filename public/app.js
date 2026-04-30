@@ -82,11 +82,16 @@ let state = {
   rightData: [],
   leftCount: 0,
   rightCount: 0,
+  leftIsObject: false,
+  rightIsObject: false,
+  leftKeys: [],
+  rightKeys: [],
   mappings: [{ leftField: '', rightField: '', leftTransform: null, rightTransform: null }],
   matchPairs: [],
   matchIndex: -1,
   mergeResult: null,
   activeMappingIndex: -1,
+  template: null,
   nested: {
     enabled: false,
     mode: 'parent-child',
@@ -733,6 +738,7 @@ async function doMerge() {
     renderMatchStats(data.stats);
     $('#btnExport').style.display = '';
     $('#btnCopy').style.display = '';
+    $('#templateSection').classList.remove('hidden');
     showToast('合并完成！', 'success');
   } catch (err) {
     showToast(err.message);
@@ -832,6 +838,10 @@ function initUpload() {
       state.mergeResult = null;
       state.matchPairs = [];
       state.matchIndex = -1;
+      state.leftIsObject = data.leftIsObject;
+      state.rightIsObject = data.rightIsObject;
+      state.leftKeys = data.leftKeys;
+      state.rightKeys = data.rightKeys;
       state.nested = {
         enabled: false,
         mode: 'parent-child',
@@ -851,7 +861,15 @@ function initUpload() {
 
       $('#step1').classList.add('hidden');
       $('#step1_5').classList.remove('hidden');
-      showToast('文件上传成功！', 'success');
+      
+      if (data.leftIsObject || data.rightIsObject) {
+        const msg = [];
+        if (data.leftIsObject) msg.push(`左侧检测为对象结构(${data.leftKeys.length}个键)`);
+        if (data.rightIsObject) msg.push(`右侧检测为对象结构(${data.rightKeys.length}个键)`);
+        showToast(msg.join('，') + '，已自动转换为数组', 'success');
+      } else {
+        showToast('文件上传成功！', 'success');
+      }
     } catch (err) {
       showToast(err.message);
     } finally {
@@ -1308,6 +1326,145 @@ function initNestedControls() {
   });
 }
 
+function initTemplateControls() {
+  $('#btnGenerateTemplate').addEventListener('click', generateTemplate);
+  $('#btnCompareTemplates').addEventListener('click', compareTemplates);
+  $('#btnValidateTemplate').addEventListener('click', validateTemplate);
+  $('#templateSearchField').addEventListener('input', filterTemplateFields);
+}
+
+async function generateTemplate() {
+  try {
+    const res = await fetch('/api/template/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: state.sessionId }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    state.template = data.template;
+    renderTemplate();
+    showToast('模板已生成！', 'success');
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function compareTemplates() {
+  try {
+    const res = await fetch('/api/template/compare', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: state.sessionId }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    renderTemplateCompare(data);
+    $('#templateCompare').classList.remove('hidden');
+    showToast('模板对比完成！', 'success');
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+async function validateTemplate() {
+  try {
+    const res = await fetch('/api/template/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId: state.sessionId }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    state.template = data.template;
+    renderTemplate();
+    renderValidation(data.validation);
+    $('#templateValidation').classList.remove('hidden');
+    showToast('验证完成！', 'success');
+  } catch (err) {
+    showToast(err.message);
+  }
+}
+
+function renderTemplate() {
+  if (!state.template) return;
+
+  $('#templateContent').classList.remove('hidden');
+  $('#templateName').textContent = state.template.name;
+  $('#templateFieldCount').textContent = `${state.template.fields.length} 个字段`;
+
+  const list = $('#templateFieldsList');
+  list.innerHTML = state.template.fields.map(f => `
+    <div class="template-field-item">
+      <span class="template-field-path">${escapeHtml(f.path)}</span>
+      <span class="template-field-type">${escapeHtml(f.type)}</span>
+      <span class="template-field-required ${f.required ? '' : 'optional'}">${f.required ? '必需' : '可选'}</span>
+      <span class="template-field-desc">${escapeHtml(f.description || '')}</span>
+    </div>
+  `).join('');
+}
+
+function filterTemplateFields() {
+  if (!state.template) return;
+
+  const search = $('#templateSearchField').value.toLowerCase();
+  const filtered = state.template.fields.filter(f => 
+    f.path.toLowerCase().includes(search) || 
+    (f.description || '').toLowerCase().includes(search)
+  );
+
+  const list = $('#templateFieldsList');
+  list.innerHTML = filtered.map(f => `
+    <div class="template-field-item">
+      <span class="template-field-path">${escapeHtml(f.path)}</span>
+      <span class="template-field-type">${escapeHtml(f.type)}</span>
+      <span class="template-field-required ${f.required ? '' : 'optional'}">${f.required ? '必需' : '可选'}</span>
+      <span class="template-field-desc">${escapeHtml(f.description || '')}</span>
+    </div>
+  `).join('');
+}
+
+function renderValidation(validation) {
+  const stats = $('#validationStats');
+  stats.innerHTML = `
+    <span class="stat match">匹配: ${validation.matchCount}</span>
+    <span class="stat missing">缺少: ${validation.missingCount}</span>
+    <span class="stat extra">多余: ${validation.extraCount}</span>
+    <span class="stat" style="background:#e0e7ff;color:#3730a3">违规: ${validation.violationCount}</span>
+  `;
+
+  const diffs = $('#validationDiffs');
+  if (validation.diffs && validation.diffs.length > 0) {
+    diffs.innerHTML = validation.diffs.slice(0, 50).map(d => `
+      <div class="diff-item ${d.status}">
+        <span class="path">${escapeHtml(d.path)}</span>
+        <span class="message">${escapeHtml(d.message)}</span>
+      </div>
+    `).join('');
+  } else {
+    diffs.innerHTML = '<div style="color:var(--gray-500);font-size:12px;">无差异</div>';
+  }
+}
+
+function renderTemplateCompare(data) {
+  const renderFields = (fields) => {
+    if (!fields || fields.length === 0) return '<div style="color:var(--gray-400);font-size:12px;">无字段</div>';
+    return fields.slice(0, 20).map(f => `
+      <div class="compare-field">
+        <span class="name">${escapeHtml(f.path)}</span>
+        <span class="type">${escapeHtml(f.type)}</span>
+      </div>
+    `).join('') + (fields.length > 20 ? `<div style="color:var(--gray-400);font-size:11px;">... 共 ${fields.length} 个字段</div>` : '');
+  };
+
+  $('#leftTemplateFields').innerHTML = renderFields(data.leftTemplate?.fields);
+  $('#rightTemplateFields').innerHTML = renderFields(data.rightTemplate?.fields);
+  $('#mergedTemplateFields').innerHTML = renderFields(data.mergedTemplate?.fields);
+}
+
 function debounce(fn, ms) {
   let timer;
   return function (...args) {
@@ -1319,4 +1476,5 @@ function debounce(fn, ms) {
 document.addEventListener('DOMContentLoaded', () => {
   initUpload();
   initNavigation();
+  initTemplateControls();
 });

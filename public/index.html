@@ -20,14 +20,14 @@
         <div class="upload-box" id="leftDrop">
           <div class="upload-icon">📄</div>
           <p>左侧数据（主表）</p>
-          <input type="file" accept=".json" id="leftFile" hidden>
+          <input type="file" accept=".json" id="leftFile" class="hidden-input">
           <label for="leftFile" class="btn btn-outline">选择文件</label>
           <span class="file-name" id="leftFileName"></span>
         </div>
         <div class="upload-box" id="rightDrop">
           <div class="upload-icon">📄</div>
           <p>右侧数据（关联表）</p>
-          <input type="file" accept=".json" id="rightFile" hidden>
+          <input type="file" accept=".json" id="rightFile" class="hidden-input">
           <label for="rightFile" class="btn btn-outline">选择文件</label>
           <span class="file-name" id="rightFileName"></span>
         </div>
@@ -245,6 +245,61 @@
           <button class="btn btn-primary" id="btnMerge">⚡ 执行合并</button>
           <button class="btn btn-outline" id="btnExport" style="display:none">⬇ 导出 JSON</button>
           <button class="btn btn-outline" id="btnCopy" style="display:none">📋 复制结果</button>
+        </div>
+
+        <!-- Template Management -->
+        <div class="template-section hidden" id="templateSection">
+          <div class="template-header">
+            <h3>📋 模板管理</h3>
+            <div class="template-actions">
+              <button class="btn btn-outline btn-sm" id="btnGenerateTemplate">生成模板</button>
+              <button class="btn btn-outline btn-sm" id="btnCompareTemplates">对比模板</button>
+              <button class="btn btn-outline btn-sm" id="btnValidateTemplate">验证数据</button>
+            </div>
+          </div>
+          
+          <div class="template-content hidden" id="templateContent">
+            <div class="template-info" id="templateInfo">
+              <div class="template-meta">
+                <span id="templateName">-</span>
+                <span id="templateFieldCount">0 个字段</span>
+              </div>
+            </div>
+            
+            <div class="template-fields-container">
+              <div class="template-fields-header">
+                <span>字段定义</span>
+                <input type="text" id="templateSearchField" placeholder="搜索字段...">
+              </div>
+              <div class="template-fields-list" id="templateFieldsList"></div>
+            </div>
+          </div>
+
+          <div class="template-validation hidden" id="templateValidation">
+            <div class="validation-header">
+              <h4>验证结果</h4>
+              <div class="validation-stats" id="validationStats"></div>
+            </div>
+            <div class="validation-diffs" id="validationDiffs"></div>
+          </div>
+
+          <div class="template-compare hidden" id="templateCompare">
+            <h4>模板对比</h4>
+            <div class="compare-grid">
+              <div class="compare-col">
+                <h5>左侧数据模板</h5>
+                <div class="compare-fields" id="leftTemplateFields"></div>
+              </div>
+              <div class="compare-col">
+                <h5>右侧数据模板</h5>
+                <div class="compare-fields" id="rightTemplateFields"></div>
+              </div>
+              <div class="compare-col">
+                <h5>合并结果模板</h5>
+                <div class="compare-fields" id="mergedTemplateFields"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
